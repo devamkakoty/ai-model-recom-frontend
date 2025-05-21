@@ -10,13 +10,14 @@ interface ResultsProps {
     cost_per_1000_inferences: number
     peak_memory_usage_gb: number
   }
+  isPostDeployment?: boolean
 }
 
-export default function ResultsDisplay({ results }: ResultsProps) {
+export default function ResultsDisplay({ results, isPostDeployment = false }: ResultsProps) {
   return (
     <div className="animate-fade-in">
       <h2 className="text-3xl font-bold mb-6 text-center bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
-        Optimization Results
+        {isPostDeployment ? "Optimization Results" : "Recommendation Results"}
       </h2>
 
       <Card className="shadow-xl border border-indigo-100 dark:border-indigo-900 overflow-hidden backdrop-blur-sm bg-white/80 dark:bg-slate-900/80 relative">
@@ -25,7 +26,7 @@ export default function ResultsDisplay({ results }: ResultsProps) {
 
         <CardHeader className="pb-2 border-b border-indigo-100 dark:border-indigo-900 bg-white/90 dark:bg-slate-900/90">
           <CardTitle className="text-2xl text-center text-indigo-700 dark:text-indigo-400">
-            Recommended Configuration
+            {isPostDeployment ? "Optimized Configuration" : "Recommended Configuration"}
           </CardTitle>
         </CardHeader>
 
@@ -37,7 +38,7 @@ export default function ResultsDisplay({ results }: ResultsProps) {
               </div>
               <div>
                 <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                  Recommended Instance
+                  {isPostDeployment ? "Optimized Instance" : "Recommended Instance"}
                 </p>
                 <p className="text-xl font-bold text-slate-900 dark:text-slate-50 mt-1">
                   {results.recommended_instance}

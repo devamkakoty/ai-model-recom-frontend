@@ -26,6 +26,17 @@ interface FormData {
   concurrency: string
 }
 
+interface ResourceMetricsData {
+  gpuUtilization: number
+  gpuMemoryUsage: number
+  cpuUtilization: number
+  ramUsage: number
+  diskIOPS: number
+  networkBandwidth: number
+  avgLatency: number
+  throughput: number
+}
+
 interface ApiResponse {
   recommended_instance: string
   expected_inference_time_ms: number
@@ -61,7 +72,12 @@ const estimateFlops = (modelType: string, paramsMillion: number): string => {
   return (paramsMillion * multiplier).toFixed(2)
 }
 
-export default function OptimizerForm() {
+interface OptimizerFormProps {
+  isPostDeployment?: boolean
+  resourceMetrics?: ResourceMetricsData | null
+}
+
+export default function OptimizerForm({ isPostDeployment = false, resourceMetrics = null }: OptimizerFormProps) {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [results, setResults] = useState<ApiResponse | null>(null)
@@ -134,6 +150,23 @@ export default function OptimizerForm() {
         latency_requirement_ms: Number.parseInt(formData.latency_requirement_ms, 10),
         throughput_requirement: Number.parseInt(formData.throughput_requirement, 10),
         concurrency: Number.parseInt(formData.concurrency, 10),
+        is_post_deployment: isPostDeployment, // Add the deployment mode flag
+      }
+
+      // Add resource metrics data if in post-deployment mode and metrics are available
+      if (isPostDeployment && resourceMetrics) {
+        Object.assign(formattedData, {
+          resource_metrics: {
+            gpu_utilization: resourceMetrics.gpuUtilization,
+            gpu_memory_usage: resourceMetrics.gpuMemoryUsage,
+            cpu_utilization: resourceMetrics.cpuUtilization,
+            ram_usage: resourceMetrics.ramUsage,
+            disk_iops: resourceMetrics.diskIOPS,
+            network_bandwidth: resourceMetrics.networkBandwidth,
+            avg_latency: resourceMetrics.avgLatency,
+            throughput: resourceMetrics.throughput,
+          },
+        })
       }
 
       console.log("Submitting form data:", formattedData)
@@ -219,6 +252,23 @@ export default function OptimizerForm() {
         latency_requirement_ms: Number.parseInt(formData.latency_requirement_ms, 10),
         throughput_requirement: Number.parseInt(formData.throughput_requirement, 10),
         concurrency: Number.parseInt(formData.concurrency, 10),
+        is_post_deployment: isPostDeployment, // Add the deployment mode flag
+      }
+
+      // Add resource metrics data if in post-deployment mode and metrics are available
+      if (isPostDeployment && resourceMetrics) {
+        Object.assign(formattedData, {
+          resource_metrics: {
+            gpu_utilization: resourceMetrics.gpuUtilization,
+            gpu_memory_usage: resourceMetrics.gpuMemoryUsage,
+            cpu_utilization: resourceMetrics.cpuUtilization,
+            ram_usage: resourceMetrics.ramUsage,
+            disk_iops: resourceMetrics.diskIOPS,
+            network_bandwidth: resourceMetrics.networkBandwidth,
+            avg_latency: resourceMetrics.avgLatency,
+            throughput: resourceMetrics.throughput,
+          },
+        })
       }
 
       console.log("Submitting to mock API:", formattedData)
@@ -301,9 +351,13 @@ export default function OptimizerForm() {
       <Card className="mb-8 shadow-xl border border-indigo-100 dark:border-indigo-900 overflow-hidden backdrop-blur-sm bg-white/80 dark:bg-slate-900/80">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/50 dark:to-purple-950/50"></div>
         <CardHeader className="border-b border-indigo-100 dark:border-indigo-900 bg-white/90 dark:bg-slate-900/90">
-          <CardTitle className="text-2xl text-indigo-700 dark:text-indigo-400">Workload Parameters</CardTitle>
+          <CardTitle className="text-2xl text-indigo-700 dark:text-indigo-400">
+            {isPostDeployment ? "Runtime Parameters" : "Workload Parameters"}
+          </CardTitle>
           <CardDescription className="text-slate-600 dark:text-slate-400">
-            Enter the details of your AI workload to get hardware recommendations
+            {isPostDeployment
+              ? "Enter the details of your running AI workload to optimize hardware configuration"
+              : "Enter the details of your AI workload to get hardware recommendations"}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -350,6 +404,23 @@ export default function OptimizerForm() {
                 </div>
               </div>
             )}
+
+            {/* Display a message if in post-deployment mode but no resource metrics are available */}
+            {isPostDeployment && !resourceMetrics && (
+              <div className="p-4 mb-4 text-sm text-amber-700 bg-amber-100 rounded-lg dark:bg-amber-900/30 dark:text-amber-300">
+                <div className="flex items-start">
+                  <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium">Resource Metrics Not Available</p>
+                    <p>
+                      No resource metrics data is available. Please refresh the resource metrics panel or manually input
+                      values.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Model Type */}
               <div className="space-y-2">
@@ -611,7 +682,7 @@ export default function OptimizerForm() {
             <Button
               type="submit"
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 dark:from-indigo-500 dark:to-purple-500 dark:hover:from-indigo-600 dark:hover:to-purple-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
-              disabled={isLoading}
+              disabled={isLoading || (isPostDeployment && !resourceMetrics)}
             >
               {isLoading ? (
                 <>
@@ -619,14 +690,14 @@ export default function OptimizerForm() {
                   Analyzing...
                 </>
               ) : (
-                "Get Recommendations"
+                `Get ${isPostDeployment ? "Optimized" : "Recommended"} Configuration`
               )}
             </Button>
           </CardFooter>
         </form>
       </Card>
 
-      {results && <ResultsDisplay results={results} />}
+      {results && <ResultsDisplay results={results} isPostDeployment={isPostDeployment} />}
     </div>
   )
 }

@@ -1,9 +1,34 @@
+"use client"
+
+import { useState } from "react"
 import OptimizerForm from "@/components/optimizer-form"
 import { Toaster } from "@/components/ui/toaster"
 import { BackgroundDecoration } from "@/components/background-decoration"
 import { Header } from "@/components/header"
+import { ResourceMetrics } from "@/components/resource-metrics"
+import { DeploymentModeToggle } from "@/components/deployment-mode-toggle"
+
+// Define the type for resource metrics
+interface ResourceMetricsData {
+  gpuUtilization: number
+  gpuMemoryUsage: number
+  cpuUtilization: number
+  ramUsage: number
+  diskIOPS: number
+  networkBandwidth: number
+  avgLatency: number
+  throughput: number
+}
 
 export default function Home() {
+  const [isPostDeployment, setIsPostDeployment] = useState(false)
+  const [resourceMetrics, setResourceMetrics] = useState<ResourceMetricsData | null>(null)
+
+  // Handler for when resource metrics change
+  const handleMetricsChange = (metrics: ResourceMetricsData) => {
+    setResourceMetrics(metrics)
+  }
+
   return (
     <>
       <BackgroundDecoration />
@@ -20,11 +45,21 @@ export default function Home() {
               AI Workload Optimizer
             </h1>
             <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto text-lg">
-              Optimize your AI workloads by finding the most cost-effective hardware configuration based on your model
-              requirements.
+              {isPostDeployment
+                ? "Optimize your running AI workloads based on actual resource utilization metrics."
+                : "Find the most cost-effective hardware configuration before deploying your AI model."}
             </p>
           </header>
-          <OptimizerForm />
+
+          <DeploymentModeToggle onChange={setIsPostDeployment} />
+
+          {isPostDeployment && (
+            <div className="mb-8">
+              <ResourceMetrics onMetricsChange={handleMetricsChange} />
+            </div>
+          )}
+
+          <OptimizerForm isPostDeployment={isPostDeployment} resourceMetrics={resourceMetrics} />
         </div>
         <Toaster />
       </main>
