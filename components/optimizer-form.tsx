@@ -139,7 +139,7 @@ export default function OptimizerForm() {
       console.log("Submitting form data:", formattedData)
 
       // Use the API endpoint
-      const response = await fetch("https://91ae-122-171-18-92.ngrok-free.app/optimize", {
+      const response = await fetch("https://51d2-122-171-18-92.ngrok-free.app/optimize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
