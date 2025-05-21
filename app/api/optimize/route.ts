@@ -6,7 +6,7 @@ export async function POST(request: Request) {
     console.log("Request body:", body)
 
     // Update this URL to your actual Flask API endpoint
-    const apiUrl = process.env.FLASK_API_URL || "https://91ae-122-171-18-92.ngrok-free.app/optimize"
+    const apiUrl = process.env.FLASK_API_URL || "https://51d2-122-171-18-92.ngrok-free.app/optimize"
     console.log("Calling API at:", apiUrl)
 
     const response = await fetch(apiUrl, {
