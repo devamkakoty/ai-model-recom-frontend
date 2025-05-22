@@ -5,9 +5,8 @@ export async function POST(request: Request) {
     const body = await request.json()
     console.log("Request body:", body)
 
-    // Update this URL to your actual Flask API endpoint
-    const apiUrl =
-      process.env.FLASK_API_URL || "https://hardware-recommendation-engine-555147084511.asia-south1.run.app/optimize"
+    // Use the real API endpoint
+    const apiUrl = "https://hardware-recommendation-engine-555147084511.asia-south1.run.app/simulate"
     console.log("Calling API at:", apiUrl)
 
     const response = await fetch(apiUrl, {
@@ -35,7 +34,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json(
         {
-          error: `Failed to get recommendations from backend: ${response.status} ${response.statusText}`,
+          error: `Failed to get simulation results from backend: ${response.status} ${response.statusText}`,
           details: errorJson || errorText.substring(0, 200) + (errorText.length > 200 ? "..." : ""),
         },
         { status: response.status },
@@ -72,10 +71,10 @@ export async function POST(request: Request) {
     console.log("API response data:", data)
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in optimization API:", error)
+    console.error("Error in simulation API:", error)
     return NextResponse.json(
       {
-        error: "Failed to process optimization request",
+        error: "Failed to process simulation request",
         details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },

@@ -7,6 +7,8 @@ import { BackgroundDecoration } from "@/components/background-decoration"
 import { Header } from "@/components/header"
 import { ResourceMetrics } from "@/components/resource-metrics"
 import { DeploymentModeToggle } from "@/components/deployment-mode-toggle"
+import { TabNavigation } from "@/components/tab-navigation"
+import { SimulatePerformance } from "@/components/simulate-performance"
 
 // Define the type for resource metrics
 interface ResourceMetricsData {
@@ -21,6 +23,7 @@ interface ResourceMetricsData {
 }
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState("simulate")
   const [isPostDeployment, setIsPostDeployment] = useState(false)
   const [resourceMetrics, setResourceMetrics] = useState<ResourceMetricsData | null>(null)
 
@@ -45,21 +48,31 @@ export default function Home() {
               AI Workload Optimizer
             </h1>
             <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto text-lg">
-              {isPostDeployment
-                ? "Optimize your running AI workloads based on actual resource utilization metrics."
-                : "Find the most cost-effective hardware configuration before deploying your AI model."}
+              {activeTab === "simulate"
+                ? "Simulate AI workload performance on different hardware configurations."
+                : isPostDeployment
+                  ? "Optimize your running AI workloads based on actual resource utilization metrics."
+                  : "Find the most cost-effective hardware configuration before deploying your AI model."}
             </p>
           </header>
 
-          <DeploymentModeToggle onChange={setIsPostDeployment} />
+          <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
 
-          {isPostDeployment && (
-            <div className="mb-8">
-              <ResourceMetrics onMetricsChange={handleMetricsChange} />
-            </div>
+          {activeTab === "optimize" && (
+            <>
+              <DeploymentModeToggle onChange={setIsPostDeployment} />
+
+              {isPostDeployment && (
+                <div className="mb-8">
+                  <ResourceMetrics onMetricsChange={handleMetricsChange} />
+                </div>
+              )}
+
+              <OptimizerForm isPostDeployment={isPostDeployment} resourceMetrics={resourceMetrics} />
+            </>
           )}
 
-          <OptimizerForm isPostDeployment={isPostDeployment} resourceMetrics={resourceMetrics} />
+          {activeTab === "simulate" && <SimulatePerformance />}
         </div>
         <Toaster />
       </main>

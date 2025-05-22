@@ -8,39 +8,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import ResultsDisplay from "./results-display"
-import { Loader2, AlertCircle } from "lucide-react"
+import { Loader2, AlertCircle, Server, Clock, DollarSign, MemoryStick } from "lucide-react"
 import { FieldInfoTooltip } from "./field-info-tooltip"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 // Define the types for our form data and API response
-interface FormData {
+interface SimulationFormData {
   model_type: string
   framework: string
   task_type: string
-  model_size: string
+  model_size_mb: string
   parameters_millions: string
   flops_billions: string
   batch_size: string
-  latency_requirement_ms: string
-  throughput_requirement: string
+  latency_req_ms: string
+  throughput_req_qps: string
 }
 
-interface ResourceMetricsData {
-  gpuUtilization: number
-  gpuMemoryUsage: number
-  cpuUtilization: number
-  ramUsage: number
-  diskIOPS: number
-  networkBandwidth: number
-  avgLatency: number
-  throughput: number
-}
-
-interface ApiResponse {
-  recommended_instance: string
-  expected_inference_time_ms: number
-  cost_per_1000_inferences: number
-  peak_memory_usage_gb: number
+interface SimulationResult {
+  hardware: string
+  latency_ms: number
+  throughput_qps: number
+  cost_per_1000: number
+  memory_gb: number
 }
 
 // Helper function to estimate FLOPs based on model type and parameters
@@ -92,30 +82,26 @@ const estimateFlops = (modelType: string, paramsMillion: number): string => {
   return (paramsMillion * multiplier).toFixed(2)
 }
 
-interface OptimizerFormProps {
-  isPostDeployment?: boolean
-  resourceMetrics?: ResourceMetricsData | null
-}
-
-export default function OptimizerForm({ isPostDeployment = false, resourceMetrics = null }: OptimizerFormProps) {
+export function SimulatePerformance() {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const [results, setResults] = useState<ApiResponse | null>(null)
+  const [results, setResults] = useState<SimulationResult[] | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [errorDetails, setErrorDetails] = useState<string | null>(null)
-  const [formData, setFormData] = useState<FormData>({
+  const [activeResultTab, setActiveResultTab] = useState<string>("table")
+  const [formData, setFormData] = useState<SimulationFormData>({
     model_type: "",
     framework: "",
-    task_type: "",
-    model_size: "",
+    task_type: "inference",
+    model_size_mb: "",
     parameters_millions: "",
     flops_billions: "",
     batch_size: "",
-    latency_requirement_ms: "",
-    throughput_requirement: "",
+    latency_req_ms: "",
+    throughput_req_qps: "",
   })
 
-  const handleSelectChange = (field: keyof FormData, value: string) => {
+  const handleSelectChange = (field: keyof SimulationFormData, value: string) => {
     setFormData((prev) => {
       const newData = { ...prev, [field]: value }
 
@@ -133,7 +119,7 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
     })
   }
 
-  const handleInputChange = (field: keyof FormData, value: string) => {
+  const handleInputChange = (field: keyof SimulationFormData, value: string) => {
     setFormData((prev) => {
       const newData = { ...prev, [field]: value }
 
@@ -162,42 +148,25 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
         model_type: formData.model_type,
         framework: formData.framework,
         task_type: formData.task_type,
-        model_size_mb: Number.parseFloat(formData.model_size),
+        model_size_mb: Number.parseFloat(formData.model_size_mb),
         parameters_millions: Number.parseFloat(formData.parameters_millions),
         flops_billions: Number.parseFloat(formData.flops_billions),
         batch_size: Number.parseInt(formData.batch_size, 10),
-        latency_requirement_ms: formData.latency_requirement_ms
-          ? Number.parseInt(formData.latency_requirement_ms, 10)
-          : null,
-        throughput_requirement: formData.throughput_requirement
-          ? Number.parseInt(formData.throughput_requirement, 10)
-          : null,
-        is_post_deployment: isPostDeployment, // Add the deployment mode flag
+        latency_req_ms: formData.latency_req_ms ? Number.parseInt(formData.latency_req_ms, 10) : null,
+        throughput_req_qps: formData.throughput_req_qps ? Number.parseInt(formData.throughput_req_qps, 10) : null,
       }
 
-      // Add resource metrics data if in post-deployment mode and metrics are available
-      if (isPostDeployment && resourceMetrics) {
-        Object.assign(formattedData, {
-          resource_metrics: {
-            gpu_utilization: resourceMetrics.gpuUtilization,
-            gpu_memory_usage: resourceMetrics.gpuMemoryUsage,
-            cpu_utilization: resourceMetrics.cpuUtilization,
-            ram_usage: resourceMetrics.ramUsage,
-            disk_iops: resourceMetrics.diskIOPS,
-            network_bandwidth: resourceMetrics.networkBandwidth,
-            avg_latency: resourceMetrics.avgLatency,
-            throughput: resourceMetrics.throughput,
-          },
-        })
-      }
+      console.log("Submitting simulation data:", formattedData)
 
-      console.log("Submitting form data:", formattedData)
+      // Use the real API endpoint
+      const apiUrl = "https://hardware-recommendation-engine-555147084511.asia-south1.run.app/simulate"
+      console.log("Calling API at:", apiUrl)
 
-      // Use the API endpoint
-      const response = await fetch("https://hardware-recommendation-engine-555147084511.asia-south1.run.app/optimize", {
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify(formattedData),
       })
@@ -217,24 +186,24 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
 
       console.log("Parsed API response:", responseData)
 
-      if (!response.ok || responseData.error) {
+      if (!response.ok || (responseData.error && typeof responseData.error === "string")) {
         const errorMsg = responseData.error || `Error: ${response.status} ${response.statusText}`
         const details = responseData.details || responseText
         throw new Error(errorMsg, { cause: details })
       }
 
-      // Check if the response has the expected structure
-      if (!responseData.recommended_instance) {
-        throw new Error("Invalid response format from API")
+      // Check if the response is an array
+      if (!Array.isArray(responseData)) {
+        throw new Error("Invalid response format from API: Expected an array of hardware options")
       }
 
       setResults(responseData)
       toast({
         title: "Success",
-        description: "Recommendations generated successfully!",
+        description: "Performance simulation completed successfully!",
       })
     } catch (error) {
-      console.error("Error fetching recommendations:", error)
+      console.error("Error simulating performance:", error)
       const errorMsg = error instanceof Error ? error.message : "Unknown error occurred"
       const errorDetails = error instanceof Error && error.cause ? String(error.cause) : undefined
 
@@ -248,13 +217,17 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
         description: errorMsg,
         variant: "destructive",
       })
+
+      // Offer to try the mock API instead
+      setErrorDetails((prev) => {
+        return (prev || "") + "\n\nYou can try using the mock API instead by clicking the button below."
+      })
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Add this function after the handleSubmit function but before the tooltipContent definition
-
+  // Function to use the mock API as a fallback
   const handleMockSubmit = async () => {
     setIsLoading(true)
     setResults(null)
@@ -267,39 +240,18 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
         model_type: formData.model_type,
         framework: formData.framework,
         task_type: formData.task_type,
-        model_size_mb: Number.parseFloat(formData.model_size),
+        model_size_mb: Number.parseFloat(formData.model_size_mb),
         parameters_millions: Number.parseFloat(formData.parameters_millions),
         flops_billions: Number.parseFloat(formData.flops_billions),
         batch_size: Number.parseInt(formData.batch_size, 10),
-        latency_requirement_ms: formData.latency_requirement_ms
-          ? Number.parseInt(formData.latency_requirement_ms, 10)
-          : null,
-        throughput_requirement: formData.throughput_requirement
-          ? Number.parseInt(formData.throughput_requirement, 10)
-          : null,
-        is_post_deployment: isPostDeployment, // Add the deployment mode flag
-      }
-
-      // Add resource metrics data if in post-deployment mode and metrics are available
-      if (isPostDeployment && resourceMetrics) {
-        Object.assign(formattedData, {
-          resource_metrics: {
-            gpu_utilization: resourceMetrics.gpuUtilization,
-            gpu_memory_usage: resourceMetrics.gpuMemoryUsage,
-            cpu_utilization: resourceMetrics.cpuUtilization,
-            ram_usage: resourceMetrics.ramUsage,
-            disk_iops: resourceMetrics.diskIOPS,
-            network_bandwidth: resourceMetrics.networkBandwidth,
-            avg_latency: resourceMetrics.avgLatency,
-            throughput: resourceMetrics.throughput,
-          },
-        })
+        latency_req_ms: formData.latency_req_ms ? Number.parseInt(formData.latency_req_ms, 10) : null,
+        throughput_req_qps: formData.throughput_req_qps ? Number.parseInt(formData.throughput_req_qps, 10) : null,
       }
 
       console.log("Submitting to mock API:", formattedData)
 
       // Use the mock API endpoint
-      const response = await fetch("/api/mock/optimize", {
+      const response = await fetch("/api/simulate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -317,10 +269,10 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
       setResults(responseData)
       toast({
         title: "Success",
-        description: "Mock recommendations generated successfully!",
+        description: "Mock simulation completed successfully!",
       })
     } catch (error) {
-      console.error("Error fetching mock recommendations:", error)
+      console.error("Error with mock simulation:", error)
       const errorMsg = error instanceof Error ? error.message : "Unknown error occurred"
       setErrorMessage(errorMsg)
 
@@ -342,7 +294,7 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
       "The deep learning framework you're using. Different frameworks may have different performance characteristics on the same hardware.",
     task_type:
       "Training requires more computational resources than inference. This significantly impacts hardware recommendations.",
-    model_size:
+    model_size_mb:
       "The size of your model in megabytes. This affects memory requirements and can be found in your model's documentation or by checking the saved model file size.",
     parameters_millions:
       "The number of trainable parameters in your model in millions. For example, a model with 5 million parameters would be entered as 5.",
@@ -363,10 +315,10 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
     ),
     batch_size:
       "The number of samples processed in a single forward/backward pass. Larger batch sizes require more memory but can improve throughput.",
-    latency_requirement_ms:
+    latency_req_ms:
       "The maximum acceptable time in milliseconds for processing a single input. Lower values require more powerful hardware. Leave empty if not a requirement.",
-    throughput_requirement:
-      "The number of inputs that need to be processed per second. Higher values require more powerful hardware or multiple instances. Leave empty if not a requirement.",
+    throughput_req_qps:
+      "The number of queries that need to be processed per second. Higher values require more powerful hardware. Leave empty if not a requirement.",
   }
 
   return (
@@ -374,13 +326,9 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
       <Card className="mb-8 shadow-xl border border-indigo-100 dark:border-indigo-900 overflow-hidden backdrop-blur-sm bg-white/80 dark:bg-slate-900/80">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/50 dark:to-purple-950/50"></div>
         <CardHeader className="border-b border-indigo-100 dark:border-indigo-900 bg-white/90 dark:bg-slate-900/90">
-          <CardTitle className="text-2xl text-indigo-700 dark:text-indigo-400">
-            {isPostDeployment ? "Runtime Parameters" : "Workload Parameters"}
-          </CardTitle>
+          <CardTitle className="text-2xl text-indigo-700 dark:text-indigo-400">Simulation Parameters</CardTitle>
           <CardDescription className="text-slate-600 dark:text-slate-400">
-            {isPostDeployment
-              ? "Enter the details of your running AI workload to optimize hardware configuration"
-              : "Enter the details of your AI workload to get hardware recommendations"}
+            Enter your AI workload details to simulate performance across different hardware options
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -400,10 +348,6 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
                         </pre>
                       </details>
                     )}
-                    <p className="mt-2 text-xs">
-                      Make sure your Flask API server is running and accessible. Check the browser console for more
-                      details.
-                    </p>
                     <div className="mt-3 flex gap-2">
                       <Button
                         type="button"
@@ -423,22 +367,6 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
                         Try Mock API
                       </Button>
                     </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Display a message if in post-deployment mode but no resource metrics are available */}
-            {isPostDeployment && !resourceMetrics && (
-              <div className="p-4 mb-4 text-sm text-amber-700 bg-amber-100 rounded-lg dark:bg-amber-900/30 dark:text-amber-300">
-                <div className="flex items-start">
-                  <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">Resource Metrics Not Available</p>
-                    <p>
-                      No resource metrics data is available. Please refresh the resource metrics panel or manually input
-                      values.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -562,17 +490,17 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
               {/* Model Size (MB) */}
               <div className="space-y-2">
                 <div className="flex items-center">
-                  <Label htmlFor="model_size" className="text-slate-700 dark:text-slate-300">
+                  <Label htmlFor="model_size_mb" className="text-slate-700 dark:text-slate-300">
                     Model Size (MB)
                   </Label>
-                  <FieldInfoTooltip content={tooltipContent.model_size} />
+                  <FieldInfoTooltip content={tooltipContent.model_size_mb} />
                 </div>
                 <Input
-                  id="model_size"
+                  id="model_size_mb"
                   type="number"
                   placeholder="Enter model size in MB"
-                  value={formData.model_size}
-                  onChange={(e) => handleInputChange("model_size", e.target.value)}
+                  value={formData.model_size_mb}
+                  onChange={(e) => handleInputChange("model_size_mb", e.target.value)}
                   className="bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-800 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                   required
                   step="0.01"
@@ -643,37 +571,37 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
               {/* Latency Requirement (ms) */}
               <div className="space-y-2">
                 <div className="flex items-center">
-                  <Label htmlFor="latency_requirement_ms" className="text-slate-700 dark:text-slate-300">
+                  <Label htmlFor="latency_req_ms" className="text-slate-700 dark:text-slate-300">
                     Latency Requirement (ms)
                   </Label>
-                  <FieldInfoTooltip content={tooltipContent.latency_requirement_ms} />
+                  <FieldInfoTooltip content={tooltipContent.latency_req_ms} />
                 </div>
                 <Input
-                  id="latency_requirement_ms"
+                  id="latency_req_ms"
                   type="number"
                   placeholder="Optional - Enter max latency in ms"
-                  value={formData.latency_requirement_ms}
-                  onChange={(e) => handleInputChange("latency_requirement_ms", e.target.value)}
+                  value={formData.latency_req_ms}
+                  onChange={(e) => handleInputChange("latency_req_ms", e.target.value)}
                   className="bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-800 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                   step="1"
                   min="1"
                 />
               </div>
 
-              {/* Throughput Requirement */}
+              {/* Throughput Requirement (QPS) */}
               <div className="space-y-2">
                 <div className="flex items-center">
-                  <Label htmlFor="throughput_requirement" className="text-slate-700 dark:text-slate-300">
-                    Throughput Requirement
+                  <Label htmlFor="throughput_req_qps" className="text-slate-700 dark:text-slate-300">
+                    Throughput Requirement (QPS)
                   </Label>
-                  <FieldInfoTooltip content={tooltipContent.throughput_requirement} />
+                  <FieldInfoTooltip content={tooltipContent.throughput_req_qps} />
                 </div>
                 <Input
-                  id="throughput_requirement"
+                  id="throughput_req_qps"
                   type="number"
                   placeholder="Optional - Enter min throughput in QPS"
-                  value={formData.throughput_requirement}
-                  onChange={(e) => handleInputChange("throughput_requirement", e.target.value)}
+                  value={formData.throughput_req_qps}
+                  onChange={(e) => handleInputChange("throughput_req_qps", e.target.value)}
                   className="bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-800 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                   step="1"
                   min="1"
@@ -685,22 +613,147 @@ export default function OptimizerForm({ isPostDeployment = false, resourceMetric
             <Button
               type="submit"
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 dark:from-indigo-500 dark:to-purple-500 dark:hover:from-indigo-600 dark:hover:to-purple-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
-              disabled={isLoading || (isPostDeployment && !resourceMetrics)}
+              disabled={isLoading}
             >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing...
+                  Simulating...
                 </>
               ) : (
-                `Get ${isPostDeployment ? "Optimized" : "Recommended"} Configuration`
+                "Simulate Performance"
               )}
             </Button>
           </CardFooter>
         </form>
       </Card>
 
-      {results && <ResultsDisplay results={results} isPostDeployment={isPostDeployment} />}
+      {results && results.length > 0 && (
+        <div className="animate-fade-in">
+          <h2 className="text-3xl font-bold mb-6 text-center bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
+            Simulation Results
+          </h2>
+
+          <Card className="shadow-xl border border-indigo-100 dark:border-indigo-900 overflow-hidden backdrop-blur-sm bg-white/80 dark:bg-slate-900/80 relative">
+            <div className="absolute inset-0 -z-10 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/50 dark:to-purple-950/50"></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500"></div>
+
+            <CardHeader className="pb-2 border-b border-indigo-100 dark:border-indigo-900 bg-white/90 dark:bg-slate-900/90">
+              <CardTitle className="text-2xl text-center text-indigo-700 dark:text-indigo-400">
+                Hardware Performance Comparison
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="p-6">
+              <Tabs value={activeResultTab} onValueChange={setActiveResultTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger value="table">Table View</TabsTrigger>
+                  <TabsTrigger value="cards">Card View</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="table" className="mt-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-indigo-50 dark:bg-indigo-900/30">
+                          <th className="px-4 py-3 text-left text-sm font-medium text-indigo-700 dark:text-indigo-300 border-b border-indigo-100 dark:border-indigo-800">
+                            Hardware
+                          </th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-indigo-700 dark:text-indigo-300 border-b border-indigo-100 dark:border-indigo-800">
+                            Latency (ms)
+                          </th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-indigo-700 dark:text-indigo-300 border-b border-indigo-100 dark:border-indigo-800">
+                            Throughput (QPS)
+                          </th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-indigo-700 dark:text-indigo-300 border-b border-indigo-100 dark:border-indigo-800">
+                            Cost per 1000
+                          </th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-indigo-700 dark:text-indigo-300 border-b border-indigo-100 dark:border-indigo-800">
+                            Memory (GB)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.map((result, index) => (
+                          <tr
+                            key={index}
+                            className={`${
+                              index % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-indigo-50/30 dark:bg-indigo-900/10"
+                            } hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors`}
+                          >
+                            <td className="px-4 py-3 border-b border-indigo-100 dark:border-indigo-800 font-medium">
+                              {result.hardware}
+                            </td>
+                            <td className="px-4 py-3 border-b border-indigo-100 dark:border-indigo-800">
+                              {result.latency_ms.toFixed(2)} ms
+                            </td>
+                            <td className="px-4 py-3 border-b border-indigo-100 dark:border-indigo-800">
+                              {result.throughput_qps.toFixed(2)}
+                            </td>
+                            <td className="px-4 py-3 border-b border-indigo-100 dark:border-indigo-800">
+                              ${result.cost_per_1000.toFixed(4)}
+                            </td>
+                            <td className="px-4 py-3 border-b border-indigo-100 dark:border-indigo-800">
+                              {result.memory_gb.toFixed(1)} GB
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="cards" className="mt-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {results.map((result, index) => (
+                      <Card
+                        key={index}
+                        className="overflow-hidden border border-indigo-100 dark:border-indigo-900 hover:shadow-lg transition-shadow duration-200"
+                      >
+                        <CardHeader className="pb-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+                          <CardTitle className="text-xl">{result.hardware}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="flex items-center">
+                              <Clock className="h-5 w-5 mr-2 text-indigo-500 dark:text-indigo-400" />
+                              <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Latency</p>
+                                <p className="font-medium">{result.latency_ms.toFixed(2)} ms</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center">
+                              <Server className="h-5 w-5 mr-2 text-blue-500 dark:text-blue-400" />
+                              <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Throughput</p>
+                                <p className="font-medium">{result.throughput_qps.toFixed(2)} QPS</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center">
+                              <DollarSign className="h-5 w-5 mr-2 text-green-500 dark:text-green-400" />
+                              <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Cost per 1000</p>
+                                <p className="font-medium">${result.cost_per_1000.toFixed(4)}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center">
+                              <MemoryStick className="h-5 w-5 mr-2 text-purple-500 dark:text-purple-400" />
+                              <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Memory</p>
+                                <p className="font-medium">{result.memory_gb.toFixed(1)} GB</p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
