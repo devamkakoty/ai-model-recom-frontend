@@ -12,7 +12,7 @@ export function Header() {
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-md bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold">
-            HP
+            
           </div>
           <span className="font-semibold text-slate-900 dark:text-slate-100">Zynthora.ai</span>
         </div>
